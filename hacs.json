@@ -1,0 +1,7 @@
+{
+  "name": "Energy Monitor",
+  "content_in_root": false,
+  "homeassistant": "2023.6.0",
+  "filename": "energy_monitor.zip",
+  "render_readme": true
+}

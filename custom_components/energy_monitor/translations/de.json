@@ -1,0 +1,58 @@
+{
+  "title": "Energy Monitor",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Gerät anlegen",
+        "description": "Wähle den Gerätetyp und vergib einen Namen.",
+        "data": {
+          "device_type": "Gerätetyp",
+          "device_name": "Anzeigename"
+        }
+      },
+      "sensors": {
+        "title": "Sensoren zuordnen",
+        "description": "Wähle die passenden Sensoren aus. Der kWh-Sensor ist ein Integralsensor oder Verbrauchszähler. Der Watt-Sensor ist optional für Echtzeit-Leistung und Betriebserkennung.",
+        "data": {
+          "kwh_sensor": "Verbrauchs-Sensor (kWh)",
+          "watt_sensor": "Leistungs-Sensor (W) — optional",
+          "price_entity": "Strompreis-Helfer (€/kWh)"
+        }
+      },
+      "options": {
+        "title": "Optionen",
+        "description": "Welche zusätzlichen Sensoren sollen automatisch erstellt werden?",
+        "data": {
+          "create_daily_meter": "Tageskosten-Sensor erstellen",
+          "create_monthly_meter": "Monatskosten-Sensor erstellen",
+          "track_status": "Betriebsstatus-Sensor erstellen",
+          "status_threshold_w": "Schwellwert für 'läuft' (Watt)"
+        }
+      }
+    },
+    "error": {
+      "sensor_not_found": "Sensor nicht gefunden. Bitte Entity-ID prüfen.",
+      "invalid_sensor": "Sensor liefert keine numerischen Werte."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Energy Monitor bearbeiten",
+        "data": {
+          "device_name": "Anzeigename",
+          "kwh_sensor": "Verbrauchs-Sensor (kWh)",
+          "watt_sensor": "Leistungs-Sensor (W) — optional",
+          "price_entity": "Strompreis-Helfer (€/kWh)",
+          "create_daily_meter": "Tageskosten-Sensor",
+          "create_monthly_meter": "Monatskosten-Sensor",
+          "track_status": "Betriebsstatus-Sensor",
+          "status_threshold_w": "Schwellwert 'läuft' (Watt)"
+        }
+      }
+    }
+  }
+}

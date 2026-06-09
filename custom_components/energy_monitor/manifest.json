@@ -1,0 +1,13 @@
+{
+  "domain": "energy_monitor",
+  "name": "Energy Monitor",
+  "version": "1.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/freakms/ha-energy-monitor",
+  "issue_tracker": "https://github.com/freakms/ha-energy-monitor/issues",
+  "dependencies": [],
+  "codeowners": ["@freakms"],
+  "requirements": [],
+  "iot_class": "local_polling",
+  "integration_type": "hub"
+}

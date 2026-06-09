@@ -1,0 +1,58 @@
+{
+  "title": "Energy Monitor",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add device",
+        "description": "Choose the device type and give it a name.",
+        "data": {
+          "device_type": "Device type",
+          "device_name": "Display name"
+        }
+      },
+      "sensors": {
+        "title": "Assign sensors",
+        "description": "Select the matching sensors. The kWh sensor should be an integration sensor or utility meter. The watt sensor is optional for real-time power and run-state detection.",
+        "data": {
+          "kwh_sensor": "Energy sensor (kWh)",
+          "watt_sensor": "Power sensor (W) — optional",
+          "price_entity": "Electricity price helper (€/kWh)"
+        }
+      },
+      "options": {
+        "title": "Options",
+        "description": "Which additional sensors should be created automatically?",
+        "data": {
+          "create_daily_meter": "Create daily cost sensor",
+          "create_monthly_meter": "Create monthly cost sensor",
+          "track_status": "Create run-state sensor",
+          "status_threshold_w": "Threshold for 'running' (watts)"
+        }
+      }
+    },
+    "error": {
+      "sensor_not_found": "Sensor not found. Please check the entity ID.",
+      "invalid_sensor": "Sensor does not return numeric values."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edit Energy Monitor device",
+        "data": {
+          "device_name": "Display name",
+          "kwh_sensor": "Energy sensor (kWh)",
+          "watt_sensor": "Power sensor (W) — optional",
+          "price_entity": "Electricity price helper (€/kWh)",
+          "create_daily_meter": "Daily cost sensor",
+          "create_monthly_meter": "Monthly cost sensor",
+          "track_status": "Run-state sensor",
+          "status_threshold_w": "Threshold 'running' (watts)"
+        }
+      }
+    }
+  }
+}
