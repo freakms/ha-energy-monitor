@@ -26,7 +26,9 @@ class EnergyMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for Energy Monitor."""
 
     VERSION = 1
-    _data: dict = {}
+
+    def __init__(self):
+        self._data: dict = {}
 
     async def async_step_user(self, user_input=None):
         """Step 1: Choose device type."""
