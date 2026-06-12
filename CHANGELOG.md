@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.1.2] – 2026-06-12
+
+### Fixed
+- Tages-/Monatskosten: Startwert wird jetzt aus dem HA-Recorder geladen (Wert von 0:00 Uhr / Monatsbeginn), nicht mehr vom Moment der Installation
+- Priorität: 1. Restore aus letztem State, 2. Recorder-Abfrage, 3. Fallback auf Momentanwert
+
 ## [v1.1.1] – 2026-06-12
 
 ### Fixed

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -206,7 +207,7 @@ class EnergyStatusSensor(SensorEntity):
 
 
 class EnergyPeriodKostenSensor(SensorEntity, RestoreEntity):
-    """Period cost sensor (daily / monthly) with midnight reset and state restore."""
+    """Period cost sensor (daily / monthly) with midnight reset and recorder-based init."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.TOTAL
@@ -235,38 +236,39 @@ class EnergyPeriodKostenSensor(SensorEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self):
-        current = _safe_float(self.hass, self._kwh_sensor) if self._period_start_kwh is not None else 0.0
+        current = _safe_float(self.hass, self._kwh_sensor)
         delta   = max(0.0, current - (self._period_start_kwh or current))
         return {
             "verbrauch_kwh": round(delta, 4),
             "periode": self._period,
             "kwh_sensor": self._kwh_sensor,
-            # persisted so we can restore it after HA restart
             "period_start_kwh": self._period_start_kwh,
         }
 
     async def async_added_to_hass(self):
-        # Restore period_start_kwh from last known state so a restart doesn't reset the counter
+        # 1. Try to restore from last saved state (survives restarts within same period)
         last_state = await self.async_get_last_state()
         if last_state and last_state.attributes.get("period_start_kwh") is not None:
             try:
                 restored = float(last_state.attributes["period_start_kwh"])
-                # Only restore if the restored start is still within the current period
                 if self._is_same_period(last_state.last_updated):
                     self._period_start_kwh = restored
-                    _LOGGER.debug(
-                        "%s: restored period_start_kwh=%.4f", self._attr_name, restored
-                    )
+                    _LOGGER.debug("%s: restored period_start_kwh=%.4f", self._attr_name, restored)
             except (ValueError, TypeError):
                 pass
 
-        # If no valid restore, initialise from the sensor's current value
+        # 2. No valid restore → query recorder for value at period start (midnight / 1st of month)
         if self._period_start_kwh is None:
-            current = _safe_float(self.hass, self._kwh_sensor)
-            if current:
-                self._period_start_kwh = current
+            recorder_value = await self._get_period_start_from_recorder()
+            if recorder_value is not None:
+                self._period_start_kwh = recorder_value
+                _LOGGER.debug("%s: recorder period_start_kwh=%.4f", self._attr_name, recorder_value)
 
-        # React to kWh / price changes
+        # 3. Fallback: start from current value (will only count from now)
+        if self._period_start_kwh is None:
+            self._period_start_kwh = _safe_float(self.hass, self._kwh_sensor)
+            _LOGGER.debug("%s: fallback period_start_kwh=%.4f", self._attr_name, self._period_start_kwh)
+
         @callback
         def _handle_state_change(event):
             self.async_write_ha_state()
@@ -286,13 +288,69 @@ class EnergyPeriodKostenSensor(SensorEntity, RestoreEntity):
             )
         )
 
+    async def _get_period_start_from_recorder(self) -> float | None:
+        """Query recorder for kWh value at midnight (daily) or 1st of month (monthly)."""
+        now = dt_util.now()
+        if self._period == "daily":
+            period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        try:
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.history import state_changes_during_period
+
+            instance = get_instance(self.hass)
+
+            # Fetch states in a window around period start
+            history = await instance.async_add_executor_job(
+                state_changes_during_period,
+                self.hass,
+                period_start - timedelta(hours=1),
+                period_start + timedelta(minutes=10),
+                self._kwh_sensor,
+                True,   # include_start_time_state
+                False,  # significant_changes_only
+            )
+
+            states = history.get(self._kwh_sensor, [])
+            # Pick the state closest to (but not after) period_start
+            best_val = None
+            best_ts = None
+            for state in states:
+                if state.state in ("unavailable", "unknown", ""):
+                    continue
+                try:
+                    val = float(state.state)
+                    ts = state.last_updated
+                    # Prefer latest state that is <= period_start + 5 min
+                    if ts <= period_start + timedelta(minutes=5):
+                        if best_ts is None or ts > best_ts:
+                            best_val = val
+                            best_ts = ts
+                except (ValueError, TypeError):
+                    continue
+
+            if best_val is not None:
+                _LOGGER.debug(
+                    "%s: recorder found start value %.4f at %s",
+                    self._attr_name, best_val, best_ts,
+                )
+                return best_val
+
+        except Exception as exc:
+            _LOGGER.debug("%s: recorder query failed: %s", self._attr_name, exc)
+
+        return None
+
     @callback
     def _handle_period_reset(self, now):
-        """Called at midnight. Reset only when the period boundary is crossed."""
+        """Called at midnight. Reset only when period boundary is crossed."""
         if self._period == "daily" or (self._period == "monthly" and now.day == 1):
             self._period_start_kwh = _safe_float(self.hass, self._kwh_sensor)
             _LOGGER.debug(
-                "%s: period reset at %s, start=%.4f", self._attr_name, now, self._period_start_kwh
+                "%s: period reset at %s, new start=%.4f",
+                self._attr_name, now, self._period_start_kwh,
             )
             self.async_write_ha_state()
 
@@ -304,7 +362,6 @@ class EnergyPeriodKostenSensor(SensorEntity, RestoreEntity):
         lu = dt_util.as_local(last_updated)
         if self._period == "daily":
             return lu.date() == now.date()
-        # monthly
         return lu.year == now.year and lu.month == now.month
 
     async def async_update(self):
