@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (z.B. 1.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version and tag
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"         >> "$GITHUB_OUTPUT"
+
+      - name: Create git tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.email "noreply@github.com"
+          git config user.name "GitHub Actions"
+          git tag "${{ steps.vars.outputs.tag }}" || true
+          git push origin "${{ steps.vars.outputs.tag }}" || true
+
+      - name: Update version in manifest.json
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" custom_components/energy_monitor/manifest.json
+
+      - name: Extract changelog section
+        id: changelog
+        env:
+          TAG: ${{ steps.vars.outputs.tag }}
+        run: |
+          python3 << 'PYEOF'
+          import re, os
+
+          tag = os.environ["TAG"]
+
+          try:
+              with open("CHANGELOG.md") as f:
+                  content = f.read()
+              pattern = rf"## \[{re.escape(tag)}\][^\n]*\n(.*?)(?=\n## \[v|\Z)"
+              match = re.search(pattern, content, re.DOTALL)
+              section = match.group(1).strip() if match else \
+                  f"_Keine Versionshinweise für {tag} in CHANGELOG.md gefunden._"
+          except FileNotFoundError:
+              section = "_CHANGELOG.md nicht gefunden._"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"notes<<CHANGELOG_EOF\n{section}\nCHANGELOG_EOF\n")
+          PYEOF
+
+      - name: Create release zip
+        run: |
+          cd custom_components
+          zip -r "../ha-energy-monitor-${{ steps.vars.outputs.tag }}.zip" energy_monitor/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ steps.vars.outputs.tag }}"
+          name: "Energy Monitor ${{ steps.vars.outputs.tag }}"
+          body: |
+            ${{ steps.changelog.outputs.notes }}
+
+            ---
+
+            ## Installation / Update
+
+            ### Via HACS
+            HACS → Integrationen → **Energy Monitor** → Update → Home Assistant neu starten
+
+            ### Manuell
+            ZIP herunterladen → `custom_components/energy_monitor/` ersetzen → Home Assistant neu starten
+          files: "ha-energy-monitor-${{ steps.vars.outputs.tag }}.zip"
